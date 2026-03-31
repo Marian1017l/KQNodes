@@ -265,6 +265,44 @@ class System:
 
         return nuevo_sistema
 
+    def k_partir(self, asignacion: tuple) -> "System":
+        """
+        Genera una k-partición a partir de una asignación de nodos a grupos.
+
+        Cada elemento de `asignacion` indica a qué grupo pertenece el nodo en
+        esa posición. Por ejemplo, (0, 2, 1) significa:
+            nodo 0 → grupo 0
+            nodo 1 → grupo 2
+            nodo 2 → grupo 1
+
+        Para cada NCubo, se marginalizan las dimensiones que pertenecen a nodos
+        de grupos distintos al propio, asumiendo independencia entre grupos.
+
+        Args:
+            asignacion (tuple): Tupla de longitud igual al número de nodos,
+                donde cada valor es el grupo asignado al nodo en esa posición.
+
+        Returns:
+            System: Sistema con los NCubos marginalizados según la k-partición.
+        """
+        nuevo_sistema = System.__new__(System)
+        nuevo_sistema.estado_inicial = self.estado_inicial
+        nuevo_sistema.memo = self.memo
+
+        if asignacion not in self.memo:
+            self.memo[asignacion] = tuple(
+                cubo.marginalizar(
+                    np.array(
+                        [dim for dim in cubo.dims if asignacion[dim] != asignacion[cubo.indice]],
+                        dtype=np.int8,
+                    )
+                )
+                for cubo in self.ncubos
+            )
+
+        nuevo_sistema.ncubos = self.memo[asignacion]
+        return nuevo_sistema
+
     def distribucion_marginal(self):
         """
         Partiendo de idealmente un subsistema o una bipartición como entrada, se seleccionana los nodos/elementos cuando su estado es OFF o inactivo para cada uno de ellos (mediante la propiedad de las distribuciones marginales) esto nos permite calcular más eficientemente la EMD-Effect, logrando así determinar un coste para dar comparación entre idealmente, un sub-sistema y una bipartición. Hemos de aplicar una reversión en la selección del estado inicial puesto se está trabajando con el dataset original.
