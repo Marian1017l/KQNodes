@@ -80,6 +80,26 @@ class GeometricSIA(SIA):
                 costo_vecinos += self._calcular_costo_transicion(v, j, tensor)
 
         return gamma * (costo_directo + costo_vecinos)
+    
+    def _construir_tabla_costos(self) -> List[np.ndarray]:
+        """
+        Construye la tabla T de costos para todas las variables del subsistema.
+
+        Para cada variable x genera una matriz T_x[i][j] = t_x(i,j)
+        de tamaño (2^m × 2^m), con todos los pares de estados posibles.
+        """
+        num_estados = 1 << self.m          # 2^m estados totales
+        tabla: List[np.ndarray] = []
+        for x in range(self.n):
+            T_x = np.zeros((num_estados, num_estados), dtype=np.float64)
+            for i in range(num_estados):
+                for j in range(num_estados):
+                    if i != j:
+                        T_x[i, j] = self._calcular_costo_transicion(
+                            i, j, self.tensors[x]
+                        )
+            tabla.append(T_x)
+        return tabla
 
 
     
