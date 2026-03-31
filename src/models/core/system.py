@@ -265,45 +265,6 @@ class System:
 
         return nuevo_sistema
 
-    def k_partir(self, asig_futuro: tuple, asig_presente: tuple) -> "System":
-        """
-        Genera una k-partición asignando futuro y presente de forma independiente.
-
-        `asig_futuro[i]`  indica el grupo del nodo i como salida (t+1).
-        `asig_presente[i]` indica el grupo del nodo i como entrada (t).
-
-        Para cada NCubo (cuyo índice marca su rol en el futuro), se marginalizan
-        las dimensiones d cuyo grupo en asig_presente sea distinto al grupo del
-        propio cubo en asig_futuro. Esto reproduce exactamente la lógica de
-        bipartir cuando k=2.
-
-        Args:
-            asig_futuro (tuple): grupo de cada nodo en el futuro (t+1).
-            asig_presente (tuple): grupo de cada nodo en el presente (t).
-
-        Returns:
-            System: Sistema con los NCubos marginalizados según la k-partición.
-        """
-        nuevo_sistema = System.__new__(System)
-        nuevo_sistema.estado_inicial = self.estado_inicial
-        nuevo_sistema.memo = self.memo
-
-        clave = (asig_futuro, asig_presente)
-        if clave not in self.memo:
-            self.memo[clave] = tuple(
-                cubo.marginalizar(
-                    np.array(
-                        [dim for dim in cubo.dims
-                         if asig_presente[dim] != asig_futuro[cubo.indice]],
-                        dtype=np.int8,
-                    )
-                )
-                for cubo in self.ncubos
-            )
-
-        nuevo_sistema.ncubos = self.memo[clave]
-        return nuevo_sistema
-
     def distribucion_marginal(self):
         """
         Partiendo de idealmente un subsistema o una bipartición como entrada, se seleccionana los nodos/elementos cuando su estado es OFF o inactivo para cada uno de ellos (mediante la propiedad de las distribuciones marginales) esto nos permite calcular más eficientemente la EMD-Effect, logrando así determinar un coste para dar comparación entre idealmente, un sub-sistema y una bipartición. Hemos de aplicar una reversión en la selección del estado inicial puesto se está trabajando con el dataset original.
