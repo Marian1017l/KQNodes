@@ -133,23 +133,32 @@ def subconjuntos(arr: np.ndarray):
 
 def generar_k_particiones(num_elementos: int, k: int):
     """
-    Genera todas las formas de asignar num_elementos elementos a k grupos (0..k-1).
-    Excluye particiones triviales (todos los elementos en el mismo grupo).
+    Genera todos los pares (asig_futuro, asig_presente) para una k-partición.
+
+    Cada asignación es una tupla de longitud `num_elementos` con valores en
+    {0, ..., k-1}. El futuro (t+1) y el presente (t) se asignan de forma
+    independiente, igual que en bipartir donde alcance y mecanismo son
+    parámetros separados.
+
+    Se excluyen los pares triviales: aquellos en los que tanto asig_futuro
+    como asig_presente asignan todos los elementos al mismo grupo (no hay corte).
 
     Args:
-        num_elementos: cantidad de elementos a particionar
+        num_elementos: número de nodos del sistema
         k: número de grupos
 
     Yields:
-        tuple de longitud num_elementos con valores en {0, 1, ..., k-1}
+        (asig_futuro, asig_presente): par de tuplas de longitud num_elementos
     """
     if k < 2:
         raise ValueError(f"k debe ser al menos 2, se recibió k={k}")
     if num_elementos < 1:
         raise ValueError(f"num_elementos debe ser al menos 1, se recibió {num_elementos}")
 
-    triviales = {tuple([g] * num_elementos) for g in range(k)}
+    uniformes = {tuple([g] * num_elementos) for g in range(k)}
 
-    for asignacion in product(range(k), repeat=num_elementos):
-        if asignacion not in triviales:
-            yield asignacion
+    for asig_futuro in product(range(k), repeat=num_elementos):
+        for asig_presente in product(range(k), repeat=num_elementos):
+            if asig_futuro in uniformes and asig_presente in uniformes:
+                continue
+            yield asig_futuro, asig_presente

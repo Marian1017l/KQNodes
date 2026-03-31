@@ -265,22 +265,21 @@ class System:
 
         return nuevo_sistema
 
-    def k_partir(self, asignacion: tuple) -> "System":
+    def k_partir(self, asig_futuro: tuple, asig_presente: tuple) -> "System":
         """
-        Genera una k-partición a partir de una asignación de nodos a grupos.
+        Genera una k-partición asignando futuro y presente de forma independiente.
 
-        Cada elemento de `asignacion` indica a qué grupo pertenece el nodo en
-        esa posición. Por ejemplo, (0, 2, 1) significa:
-            nodo 0 → grupo 0
-            nodo 1 → grupo 2
-            nodo 2 → grupo 1
+        `asig_futuro[i]`  indica el grupo del nodo i como salida (t+1).
+        `asig_presente[i]` indica el grupo del nodo i como entrada (t).
 
-        Para cada NCubo, se marginalizan las dimensiones que pertenecen a nodos
-        de grupos distintos al propio, asumiendo independencia entre grupos.
+        Para cada NCubo (cuyo índice marca su rol en el futuro), se marginalizan
+        las dimensiones d cuyo grupo en asig_presente sea distinto al grupo del
+        propio cubo en asig_futuro. Esto reproduce exactamente la lógica de
+        bipartir cuando k=2.
 
         Args:
-            asignacion (tuple): Tupla de longitud igual al número de nodos,
-                donde cada valor es el grupo asignado al nodo en esa posición.
+            asig_futuro (tuple): grupo de cada nodo en el futuro (t+1).
+            asig_presente (tuple): grupo de cada nodo en el presente (t).
 
         Returns:
             System: Sistema con los NCubos marginalizados según la k-partición.
@@ -289,18 +288,20 @@ class System:
         nuevo_sistema.estado_inicial = self.estado_inicial
         nuevo_sistema.memo = self.memo
 
-        if asignacion not in self.memo:
-            self.memo[asignacion] = tuple(
+        clave = (asig_futuro, asig_presente)
+        if clave not in self.memo:
+            self.memo[clave] = tuple(
                 cubo.marginalizar(
                     np.array(
-                        [dim for dim in cubo.dims if asignacion[dim] != asignacion[cubo.indice]],
+                        [dim for dim in cubo.dims
+                         if asig_presente[dim] != asig_futuro[cubo.indice]],
                         dtype=np.int8,
                     )
                 )
                 for cubo in self.ncubos
             )
 
-        nuevo_sistema.ncubos = self.memo[asignacion]
+        nuevo_sistema.ncubos = self.memo[clave]
         return nuevo_sistema
 
     def distribucion_marginal(self):
