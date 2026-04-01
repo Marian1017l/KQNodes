@@ -114,6 +114,42 @@ class GeometricSIA(SIA):
         return tabla
 
 
+    def _identificar_candidatos(self, tabla: List[np.ndarray]) -> list:
+        """
+        Identifica biparticiones candidatas usando patrones de costo máximo en T.
+
+        Para cada variable x y cada estado j, el estado i con mayor costo
+        t_x(i,j) indica qué bits del mecanismo deben separarse.
+        La máscara (i XOR j) define el candidato a bipartición.
+        """
+        indices = self.sia_subsistema.indices_ncubos  # variables de alcance (futuro)
+        dims    = self.sia_subsistema.dims_ncubos     # variables de mecanismo (presente)
+        candidatos = set()
+
+        for x in range(self.n):
+            T_x = tabla[x]
+            for j in range(1 << self.m):
+                costos = T_x[:, j].copy()
+                costos[j] = -1.0                      # excluir i == j
+                i_max = int(np.argmax(costos))
+
+                mascara = i_max ^ j                   # bits que más "cuestan" separar
+                if mascara == 0:
+                    continue
+
+                # sub_alcance: la variable x actual
+                # sub_mecanismo: las variables de presente marcadas por la máscara
+                sub_alcance   = (int(indices[x]),)
+                sub_mecanismo = tuple(
+                    int(dims[b]) for b in range(self.m) if (mascara >> b) & 1
+                )
+
+                if sub_alcance and sub_mecanismo:
+                    candidatos.add((sub_alcance, sub_mecanismo))
+
+        return list(candidatos)
+
+
 
         
 
