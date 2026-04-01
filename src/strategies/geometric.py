@@ -83,24 +83,37 @@ class GeometricSIA(SIA):
     
     def _construir_tabla_costos(self) -> List[np.ndarray]:
         """
-        Construye la tabla T de costos para todas las variables del subsistema.
-
-        Para cada variable x genera una matriz T_x[i][j] = t_x(i,j)
-        de tamaño (2^m × 2^m), con todos los pares de estados posibles.
+        Construye la tabla T de costos usando DP bottom-up.
+        Procesa pares (i,j) en orden creciente de distancia Hamming,
+        garantizando que cada subproblema se calcula exactamente una vez.
         """
-        num_estados = 1 << self.m          # 2^m estados totales
+        num_estados = 1 << self.m
         tabla: List[np.ndarray] = []
+
         for x in range(self.n):
             T_x = np.zeros((num_estados, num_estados), dtype=np.float64)
-            for i in range(num_estados):
-                for j in range(num_estados):
-                    if i != j:
-                        T_x[i, j] = self._calcular_costo_transicion(
-                            i, j, self.tensors[x]
+            tensor = self.tensors[x]
+
+            for j in range(num_estados):
+                # Procesa distancias de menor a mayor → d=1 primero, d=m al final
+                for d in range(1, self.m + 1):
+                    gamma = 2.0 ** (-d)
+                    for i in range(num_estados):
+                        if bin(i ^ j).count('1') != d:
+                            continue
+                        costo_directo = abs(float(tensor[i]) - float(tensor[j]))
+                        # Los vecinos (d-1) ya están calculados en T_x
+                        costo_vecinos = sum(
+                            T_x[i ^ (1 << bit), j]
+                            for bit in range(self.m)
+                            if bin((i ^ (1 << bit)) ^ j).count('1') < d
                         )
+                        T_x[i, j] = gamma * (costo_directo + costo_vecinos)
+
             tabla.append(T_x)
         return tabla
 
 
-    
+
+        
 
