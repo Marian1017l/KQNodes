@@ -2,6 +2,7 @@ from src.controllers.manager import Manager
 
 # 👇 Importación de estrategias 👇 #
 from src.strategies.force import BruteForce
+from src.strategies.geometric import GeometricSIA
 
 
 def iniciar():
@@ -16,13 +17,15 @@ def iniciar():
     gestor_redes = Manager(estado_inicial)
     mpt = gestor_redes.cargar_red()
 
-    ### Ejemplo de solución mediante módulo de fuerza bruta ###
-    analizador_bf = BruteForce(mpt)
-
-    sia_cero = analizador_bf.aplicar_estrategia(
+    # Prueba GeometricSIA
+    analizador_geo = GeometricSIA(mpt)
+    resultado = analizador_geo.aplicar_estrategia(
         estado_inicial,
         condiciones,
         alcance,
         mecanismo,
     )
-    print(sia_cero)
+    print(resultado)
+
+if __name__ == "__main__":
+    iniciar()

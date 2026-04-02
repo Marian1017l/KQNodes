@@ -154,8 +154,8 @@ class GeometricSIA(SIA):
             T_x = tabla[x]
             for j in range(1 << self.m):
                 costos = T_x[:, j].copy()
-                costos[j] = np.int                     # excluir i == j
-                i_min = int(np.argin(costos))
+                costos[j] = np.inf                     # excluir i == j
+                i_min = int(np.argmin(costos))
 
                 mascara = i_min ^ j                   # bits que más "cuestan" separar
                 if mascara == 0:
