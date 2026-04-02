@@ -17,6 +17,13 @@ def iniciar():
     gestor_redes = Manager(estado_inicial)
     mpt = gestor_redes.cargar_red()
 
+    analizador_bf = BruteForce(mpt)
+    resultado_bf = analizador_bf.aplicar_estrategia(
+        estado_inicial, condiciones, alcance, mecanismo,
+    )
+    print(resultado_bf)
+
+
     # Prueba GeometricSIA
     analizador_geo = GeometricSIA(mpt)
     resultado = analizador_geo.aplicar_estrategia(
