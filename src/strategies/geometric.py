@@ -41,10 +41,13 @@ class GeometricSIA(SIA):
         self.n = self.sia_subsistema.indices_ncubos.size
         self.m = self.sia_subsistema.dims_ncubos.size
         self.tensors = [
-            self.sia_subsistema.ncubos[i].data.flatten()
-            for i in range(self.n)
-    ]
+            self._tensor_de(i) for i in range(self.n)
+        ]
     
+    def _tensor_de(self, var_index:int) -> np.ndarray:
+        ncube = self.sia_subsistema.ncubos[var_index]
+        return ncube.data.flatten()
+
     def _hallar_candidatos(self):
         indices = self.sia_subsistema.indices_ncubos
         n = self.n
