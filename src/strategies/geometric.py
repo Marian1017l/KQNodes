@@ -6,6 +6,10 @@ from src.middlewares.slogger import SafeLogger
 from src.models.base.sia import SIA
 from src.models.core.solution import Solution
 from src.constants.models import GEOMETRIC_STRAREGY_TAG
+from typing import Callable
+from src.funcs.iit import seleccionar_emd
+from src.funcs.format import fmt_biparticion_fuerza_bruta
+from src.constants.base import ACTUAL, EFFECT
 
 
 class GeometricSIA(SIA):
@@ -17,6 +21,7 @@ class GeometricSIA(SIA):
         super().__init__(tpm)
         self.n: int = 0
         self.m: int = 0
+        self.distancia_metrica: Callable = seleccionar_emd()
         self.tensors: List[np.ndarray] = []
         self.logger = SafeLogger(GEOMETRIC_STRAREGY_TAG)
 
@@ -152,6 +157,41 @@ class GeometricSIA(SIA):
 
         return list(candidatos)
 
+    def _evaluar_candidatos(self, candidatos: list) -> tuple:
+        """
+        Evalúa cada bipartición candidata y retorna la de menor pérdida φ.
+        Usa la EMD configurada en el proyecto (emd_efecto por defecto).
+        """
+        futuros  = self.sia_subsistema.indices_ncubos
+        presentes = self.sia_subsistema.dims_ncubos
+
+        mejor_phi  = np.inf
+        mejor_dist = None
+        mejor_fmt  = None
+
+        for sub_alcance, sub_mecanismo in candidatos:
+            arr_alcance   = np.array(sub_alcance,   dtype=np.int8)
+            arr_mecanismo = np.array(sub_mecanismo, dtype=np.int8)
+
+            particion      = self.sia_subsistema.bipartir(arr_alcance, arr_mecanismo)
+            dist_particion = particion.distribucion_marginal()
+            phi            = self.distancia_metrica(dist_particion, self.sia_dists_marginales)
+
+            if phi < mejor_phi:
+                mejor_phi  = phi
+                mejor_dist = dist_particion
+
+                biparticion_prim = (sub_mecanismo, sub_alcance)
+                biparticion_dual = (
+                    tuple(set(presentes.tolist()) - set(sub_mecanismo)),
+                    tuple(set(futuros.tolist())   - set(sub_alcance)),
+                )
+                mejor_fmt = fmt_biparticion_fuerza_bruta(
+                    [biparticion_prim[ACTUAL], biparticion_prim[EFFECT]],
+                    [biparticion_dual[ACTUAL], biparticion_dual[EFFECT]],
+                )
+
+        return mejor_phi, mejor_dist, mejor_fmt
 
 
         
