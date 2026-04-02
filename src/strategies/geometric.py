@@ -140,11 +140,12 @@ class GeometricSIA(SIA):
 
     def _identificar_candidatos(self, tabla: List[np.ndarray]) -> list:
         """
-        Identifica biparticiones candidatas usando patrones de costo máximo en T.
+        Identifica biparticiones candidatas usando patrones de costo mínimo en T.
 
-        Para cada variable x y cada estado j, el estado i con mayor costo
-        t_x(i,j) indica qué bits del mecanismo deben separarse.
-        La máscara (i XOR j) define el candidato a bipartición.
+        Para cada variable x y cada estado j, el estado i con menor costo
+        t_x(i,j) indica qué bits del mecanismo se pueden separar con menor pérdida.
+        También agrega cortes totales (sub_mecanismo vacío) que el patrón de
+        costo mínimo no detecta pero son biparticiones válidas.
         """
         indices = self.sia_subsistema.indices_ncubos  # variables de alcance (futuro)
         dims    = self.sia_subsistema.dims_ncubos     # variables de mecanismo (presente)
@@ -154,15 +155,13 @@ class GeometricSIA(SIA):
             T_x = tabla[x]
             for j in range(1 << self.m):
                 costos = T_x[:, j].copy()
-                costos[j] = np.inf                     # excluir i == j
+                costos[j] = np.inf                    # excluir i == j
                 i_min = int(np.argmin(costos))
 
-                mascara = i_min ^ j                   # bits que más "cuestan" separar
+                mascara = i_min ^ j                   # bits que menos cuestan separar
                 if mascara == 0:
                     continue
 
-                # sub_alcance: la variable x actual
-                # sub_mecanismo: las variables de presente marcadas por la máscara
                 sub_alcance   = (int(indices[x]),)
                 sub_mecanismo = tuple(
                     int(dims[b]) for b in range(self.m) if (mascara >> b) & 1
@@ -171,8 +170,11 @@ class GeometricSIA(SIA):
                 if sub_alcance and sub_mecanismo:
                     candidatos.add((sub_alcance, sub_mecanismo))
 
-        return list(candidatos)
+            # Corte total: variable x sin ningún presente (sub_mecanismo vacío)
+            candidatos.add(((int(indices[x]),), ()))
 
+        return list(candidatos)
+    
     def _evaluar_candidatos(self, candidatos: list) -> tuple:
         """
         Evalúa cada bipartición candidata y retorna la de menor pérdida φ.
