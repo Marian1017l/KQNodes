@@ -1,6 +1,7 @@
 from typing import List
 
 import numpy as np
+import time
 
 from src.middlewares.slogger import SafeLogger
 from src.models.base.sia import SIA
@@ -10,6 +11,7 @@ from typing import Callable
 from src.funcs.iit import seleccionar_emd
 from src.funcs.format import fmt_biparticion_fuerza_bruta
 from src.constants.base import ACTUAL, EFFECT
+from src.constants.models import GEOMETRIC_LABEL
 
 
 class GeometricSIA(SIA):
@@ -32,8 +34,22 @@ class GeometricSIA(SIA):
         alcance: str,
         mecanismo: str,
     ) -> Solution:
-        
-        raise NotImplementedError
+        self.sia_preparar_subsistema(estado_inicial, condicion, alcance, mecanismo)
+
+        self._representacion_inicial()
+
+        tabla      = self._construir_tabla_costos()
+        candidatos = self._identificar_candidatos(tabla)
+        phi, dist, particion = self._evaluar_candidatos(candidatos)
+
+        return Solution(
+            estrategia              = GEOMETRIC_LABEL,
+            perdida                 = phi,
+            distribucion_subsistema = self.sia_dists_marginales,
+            distribucion_particion  = dist,
+            particion               = particion,
+            tiempo_total            = time.time() - self.sia_tiempo_inicio,
+        )
     
     def _representacion_inicial(self) -> None:
         """
