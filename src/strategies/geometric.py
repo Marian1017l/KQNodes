@@ -108,7 +108,6 @@ class GeometricSIA(SIA):
     def _construir_tabla_costos(self) -> List[np.ndarray]:
         """
         Calcula costos solo para j = estado actual del mecanismo.
-        Reduce complejidad de O(n·S²·m) a O(n·S·m).
         """
         S        = 1 << self.m
         popcount = np.array([bin(x).count('1') for x in range(S)], dtype=np.int8)
@@ -150,41 +149,44 @@ class GeometricSIA(SIA):
 
     def _identificar_candidatos(self, tabla: List[np.ndarray]) -> list:
         """
-        Identifica biparticiones candidatas usando patrones de costo mínimo en T.
-
-        Para cada variable x y cada estado j, el estado i con menor costo
-        t_x(i,j) indica qué bits del mecanismo se pueden separar con menor pérdida.
-        También agrega cortes totales (sub_mecanismo vacío) que el patrón de
-        costo mínimo no detecta pero son biparticiones válidas.
+        Identifica candidatos desde el vector de costos hacia j_actual.
+        - top-k estados de menor costo por variable (cobertura geométrica)
+        - corte total con mecanismo vacío (∅)
+        - pares simples (x | b) para cobertura estructural sistemática
         """
-        indices = self.sia_subsistema.indices_ncubos  # variables de alcance (futuro)
-        dims    = self.sia_subsistema.dims_ncubos     # variables de mecanismo (presente)
+        indices = self.sia_subsistema.indices_ncubos
+        dims    = self.sia_subsistema.dims_ncubos
+        j       = self._j_actual
         candidatos = set()
 
         for x in range(self.n):
-            T_x = tabla[x]
-            for j in range(1 << self.m):
-                costos = T_x[:, j].copy()
-                costos[j] = np.inf                    # excluir i == j
-                i_min = int(np.argmin(costos))
+            costos    = tabla[x].copy()
+            costos[j] = np.inf
 
-                mascara = i_min ^ j                   # bits que menos cuestan separar
+            # Top-5 estados de menor costo → candidatos geométricos
+            k      = min(5, costos.size - 1)
+            top_k  = np.argpartition(costos, k)[:k]
+
+            for i_cand in top_k:
+                mascara = int(i_cand) ^ j
                 if mascara == 0:
                     continue
-
                 sub_alcance   = (int(indices[x]),)
                 sub_mecanismo = tuple(
                     int(dims[b]) for b in range(self.m) if (mascara >> b) & 1
                 )
-
                 if sub_alcance and sub_mecanismo:
                     candidatos.add((sub_alcance, sub_mecanismo))
 
-            # Corte total: variable x sin ningún presente (sub_mecanismo vacío)
+            # Corte total: variable x sin ningún presente
             candidatos.add(((int(indices[x]),), ()))
 
+            # Pares simples: variable x vs cada variable del mecanismo
+            for b in range(self.m):
+                candidatos.add(((int(indices[x]),), (int(dims[b]),)))
+
         return list(candidatos)
-    
+
     def _evaluar_candidatos(self, candidatos: list) -> tuple:
         """
         Evalúa cada bipartición candidata y retorna la de menor pérdida φ.
