@@ -107,45 +107,45 @@ class GeometricSIA(SIA):
     
     def _construir_tabla_costos(self) -> List[np.ndarray]:
         """
-        Construye T usando DP bottom-up vectorizado con numpy.
-        - Lookup table de popcount evita bin().count('1') por par
-        - Operaciones vectorizadas sobre estados del mismo nivel d
+        Calcula costos solo para j = estado actual del mecanismo.
+        Reduce complejidad de O(n·S²·m) a O(n·S·m).
         """
-        S = 1 << self.m
-
-        # Tabla de popcount: popcount[x] = bits activos en x — calculada UNA sola vez
+        S        = 1 << self.m
         popcount = np.array([bin(x).count('1') for x in range(S)], dtype=np.int8)
         estados  = np.arange(S, dtype=np.int32)
 
+        # Estado actual del mecanismo como índice entero (little-endian)
+        dims   = self.sia_subsistema.dims_ncubos
+        estado = self.sia_subsistema.estado_inicial
+        self._j_actual = int(sum(
+            int(estado[d]) * (1 << local)
+            for local, d in enumerate(dims)
+        ))
+
         tabla: List[np.ndarray] = []
-
         for x in range(self.n):
-            T_x    = np.zeros((S, S), dtype=np.float64)
-            tensor = self.tensors[x]
+            costos_j = np.zeros(S, dtype=np.float64)
+            tensor   = self.tensors[x]
+            j        = self._j_actual
 
-            for j in range(S):
-                diff         = estados ^ j              # diff[i] = i XOR j (todos los i a la vez)
-                dist         = popcount[diff]           # distancia Hamming de cada i a j
-                costo_directo = np.abs(tensor - tensor[j])  # |X[i]-X[j]| para todos los i
+            diff          = estados ^ j
+            dist          = popcount[diff]
+            costo_directo = np.abs(tensor - tensor[j])
 
-                for d in range(1, self.m + 1):
-                    gamma    = 2.0 ** (-d)
-                    states_d = np.where(dist == d)[0]   # estados a distancia d de j
-                    if states_d.size == 0:
-                        continue
+            for d in range(1, self.m + 1):
+                gamma    = 2.0 ** (-d)
+                states_d = np.where(dist == d)[0]
+                if states_d.size == 0:
+                    continue
+                diff_d        = diff[states_d]
+                costo_vecinos = np.zeros(states_d.size, dtype=np.float64)
+                for b in range(self.m):
+                    tiene_bit     = (diff_d >> b) & 1
+                    vecinos       = states_d ^ (1 << b)
+                    costo_vecinos += tiene_bit * costos_j[vecinos]
+                costos_j[states_d] = gamma * (costo_directo[states_d] + costo_vecinos)
 
-                    diff_d        = diff[states_d]      # XOR de esos estados con j
-                    costo_vecinos = np.zeros(states_d.size, dtype=np.float64)
-
-                    # Vectorizado: revisar cada bit sin loop Python por estado
-                    for b in range(self.m):
-                        tiene_bit  = (diff_d >> b) & 1          # 1 si bit b difiere con j
-                        vecinos    = states_d ^ (1 << b)        # flip bit b
-                        costo_vecinos += tiene_bit * T_x[vecinos, j]  # solo suma si bit activo
-
-                    T_x[states_d, j] = gamma * (costo_directo[states_d] + costo_vecinos)
-
-            tabla.append(T_x)
+            tabla.append(costos_j)
         return tabla
 
     def _identificar_candidatos(self, tabla: List[np.ndarray]) -> list:
