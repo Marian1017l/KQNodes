@@ -122,29 +122,37 @@ class GeometricSIA(SIA):
         ))
 
         tabla: List[np.ndarray] = []
+        pos_global = {d: i for i, d in enumerate(dims)}
         for x in range(self.n):
             costos_j = np.zeros(S, dtype=np.float64)
             tensor   = self.tensors[x]
             j        = self._j_actual
 
+            ncubo = self.sia_subsistema.ncubos[x]
+            dims_local = ncubo.dims
+
+            j_local = 0
+            for i, d in enumerate(dims_local):
+                bit = (j >> pos_global[d]) & 1
+                j_local |= (bit << i)
+
             diff          = estados ^ j
             dist          = popcount[diff]
-            costo_directo = np.abs(tensor - tensor[j])
+            costo_directo = np.abs(tensor - tensor[j_local])
 
             for d in range(1, self.m + 1):
                 gamma    = 2.0 ** (-d)
                 states_d = np.where(dist == d)[0]
                 if states_d.size == 0:
                     continue
-                diff_d        = diff[states_d]
                 costo_vecinos = np.zeros(states_d.size, dtype=np.float64)
                 for b in range(self.m):
-                    tiene_bit     = (diff_d >> b) & 1
-                    vecinos       = states_d ^ (1 << b)
-                    costo_vecinos += tiene_bit * costos_j[vecinos]
+                    vecinos = states_d ^ (1 << b)
+                    mask_validos = (popcount[vecinos ^ j] == d - 1)
+                    costo_vecinos += mask_validos * costos_j[vecinos]
                 costos_j[states_d] = gamma * (costo_directo[states_d] + costo_vecinos)
-
             tabla.append(costos_j)
+
         return tabla
 
     def _identificar_candidatos(self, tabla: List[np.ndarray]) -> list:
@@ -222,7 +230,3 @@ class GeometricSIA(SIA):
                 )
 
         return mejor_phi, mejor_dist, mejor_fmt
-
-
-        
-
