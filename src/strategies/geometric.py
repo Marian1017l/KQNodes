@@ -8,7 +8,7 @@ from src.models.base.sia import SIA
 from src.models.core.solution import Solution
 from src.constants.models import GEOMETRIC_STRAREGY_TAG
 from typing import Callable
-from src.funcs.iit import seleccionar_emd
+from src.funcs.iit import seleccionar_emd, count_bits, hamming_distance
 from src.funcs.format import fmt_biparticion_fuerza_bruta
 from src.constants.base import ACTUAL, EFFECT
 from src.constants.models import GEOMETRIC_LABEL
@@ -110,7 +110,7 @@ class GeometricSIA(SIA):
         Calcula costos solo para j = estado actual del mecanismo.
         """
         S        = 1 << self.m
-        popcount = np.array([bin(x).count('1') for x in range(S)], dtype=np.int8)
+        popcount = np.array([count_bits(x) for x in range(S)], dtype=np.int8)
         estados  = np.arange(S, dtype=np.int32)
 
         # Estado actual del mecanismo como índice entero (little-endian)
