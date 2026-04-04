@@ -67,7 +67,11 @@ class GeometricSIA(SIA):
     
     def _tensor_de(self, var_index:int) -> np.ndarray:
         ncube = self.sia_subsistema.ncubos[var_index]
-        return ncube.data.flatten()
+        tensor = ncube.data.flatten().astype(np.float64)
+        suma = np.sum(tensor)
+        if suma == 0:
+            raise ValueError(f"Tensor inválido para variable {var_index}: suma = 0")
+        return tensor / suma
 
     def _hallar_candidatos(self):
         indices = self.sia_subsistema.indices_ncubos
