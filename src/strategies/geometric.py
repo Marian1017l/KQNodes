@@ -166,25 +166,8 @@ class GeometricSIA(SIA):
 
     def _identificar_candidatos(self, tabla: List[np.ndarray]) -> list:
         """
-        Identifica candidatos desde el vector de costos hacia j_actual
-        mediante análisis de complementariedad geométrica mínima.
-
-        Los estados con costo mínimo de transición hacia j_actual representan
-        configuraciones estructuralmente más cercanas en el hipercubo. El XOR
-        entre el estado candidato y j_actual define directamente las variables
-        del mecanismo que participan en la bipartición (GeoMIP §4.2.4).
-
-        La selección usa tolerancia relativa (np.isclose) para capturar empates
-        reales independientemente de la escala de los datos: el umbral efectivo
-        escala con |costo_min|, evitando tanto falsos empates (tolerancia fija
-        grande sobre costos pequeños) como empates omitidos (tolerancia fija
-        pequeña sobre costos grandes).
-
-        En sistemas geométricamente degenerados (distribuciones casi uniformes),
-        donde más de m+1 estados alcanzan el mínimo, se aplica un filtro
-        secundario por distancia Hamming mínima a j_actual: en el hipercubo
-        m-dimensional, los m vecinos inmediatos son las únicas referencias
-        topológicas no arbitrarias.
+        Selecciona candidatos de bipartición a partir de los estados
+        con menor costo de transición hacia j_actual.
         """
         indices    = self.sia_subsistema.indices_ncubos
         dims       = self.sia_subsistema.dims_ncubos
@@ -195,23 +178,20 @@ class GeometricSIA(SIA):
             costos    = tabla[x].copy()
             costos[j] = np.inf
 
-            # Empates reales por complementariedad geométrica (tolerancia relativa)
-            # |costos - costo_min| <= atol + rtol * |costo_min|
-            # atol=1e-15 cubre el caso costo_min≈0 (ε_machine); rtol escala con la magnitud
+           # Encontrar estados con costo mínimo (con tolerancia numérica)
             costo_min   = costos.min()
             estados_min = np.where(
                 np.isclose(costos, costo_min, rtol=1e-9, atol=1e-15)
             )[0]
 
-            # Filtro secundario por distancia Hamming mínima en degeneración geométrica.
-            # Umbral m+1: en un hipercubo m-dimensional exactamente m vértices están
-            # a distancia 1 de j; más de m+1 empates implican degeneración.
+            # Si hay demasiados empates → quedarse con los más cercanos (Hamming)
             if estados_min.size > self.m + 1:
                 hamming     = np.array(
                     [bin(int(i) ^ j).count('1') for i in estados_min], dtype=np.int32
                 )
                 estados_min = estados_min[hamming == hamming.min()]
 
+            # Convertir estados a particiones usando XOR
             for i_cand in estados_min:
                 mascara = int(i_cand) ^ j
                 if mascara == 0:
@@ -252,6 +232,7 @@ class GeometricSIA(SIA):
             dist_particion = particion.distribucion_marginal()
             phi            = self.distancia_metrica(dist_particion, self.sia_dists_marginales)
 
+            print("Candidato:", sub_alcance, sub_mecanismo, "phi=", phi)
             if phi < mejor_phi:
                 mejor_phi  = phi
                 mejor_dist = dist_particion
