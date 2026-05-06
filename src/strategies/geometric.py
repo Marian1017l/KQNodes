@@ -68,42 +68,6 @@ class GeometricSIA(SIA):
     def _tensor_de(self, var_index:int) -> np.ndarray:
         ncube = self.sia_subsistema.ncubos[var_index]
         return ncube.data.flatten().astype(np.float64)
-
-    def _hallar_candidatos(self):
-        indices = self.sia_subsistema.indices_ncubos
-        n = self.n
-        for mask in range(1, (1 << n) // 2 + 1):
-            subalcance = tuple(
-                int(indices[i]) for i in range(n) if (mask >> i) & 1
-            )
-            submecanismo = tuple(
-                int(indices[j]) for j in range(n) if not ((mask >> j) & 1)
-            )
-            yield subalcance, submecanismo
-    
-    def _calcular_costo_transicion(self, i: int, j: int, tensor: np.ndarray) -> float:
-        """
-        Calcula t_x(i,j) según la fórmula recursiva de GeoMIP (Algorithm 1).
-
-        t_x(i,j) = y · ( |X[i] - X[j]| + Σ_{k ∈ N(i,j)} t_x(k, j) )
-        y = 2^(-d_H(i,j))
-        N(i,j) = vecinos v con d_H(i,v)=1 y d_H(v,j) < d_H(i,j)
-        """
-        if i == j:
-            return 0.0
-
-        d = bin(i ^ j).count('1')        # distancia Hamming
-        gamma = 2.0 ** (-d)
-
-        costo_directo = abs(float(tensor[i]) - float(tensor[j]))
-
-        costo_vecinos = 0.0
-        for bit in range(self.m):
-            v = i ^ (1 << bit)           # flip de un bit
-            if bin(v ^ j).count('1') < d:  # v está más cerca de j → es vecino válido
-                costo_vecinos += self._calcular_costo_transicion(v, j, tensor)
-
-        return gamma * (costo_directo + costo_vecinos)
     
     def _construir_tabla_costos(self) -> List[np.ndarray]:
         """
