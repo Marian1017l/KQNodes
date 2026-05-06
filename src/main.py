@@ -1,6 +1,4 @@
 from src.controllers.manager import Manager
-
-# 👇 Importación de estrategias 👇 #
 from src.strategies.force import BruteForce
 from src.strategies.geometric import GeometricSIA
 
@@ -9,10 +7,10 @@ def iniciar():
     """Punto de entrada"""
 
     # ABCD #
-    estado_inicial = "1000"
-    condiciones    = "1110"
-    alcance        = "1110"
-    mecanismo      = "1110"
+    estado_inicial = "100000"
+    condiciones    = "111110"
+    alcance        = "111110"
+    mecanismo      = "111110"
 
     gestor_redes = Manager(estado_inicial)
     mpt = gestor_redes.cargar_red()

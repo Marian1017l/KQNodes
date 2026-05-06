@@ -67,11 +67,7 @@ class GeometricSIA(SIA):
     
     def _tensor_de(self, var_index:int) -> np.ndarray:
         ncube = self.sia_subsistema.ncubos[var_index]
-        tensor = ncube.data.flatten().astype(np.float64)
-        suma = np.sum(tensor)
-        if suma == 0:
-            raise ValueError(f"Tensor inválido para variable {var_index}: suma = 0")
-        return tensor / suma
+        return ncube.data.flatten().astype(np.float64)
 
     def _hallar_candidatos(self):
         indices = self.sia_subsistema.indices_ncubos
@@ -136,13 +132,22 @@ class GeometricSIA(SIA):
             dims_local = ncubo.dims
 
             j_local = 0
-            for i, d in enumerate(dims_local):
+            for pos_local, d in enumerate(dims_local):
                 bit = (j >> pos_global[d]) & 1
-                j_local |= (bit << i)
+                j_local |= (bit << pos_local)
+
+            # Proyección de todos los estados globales al espacio local del n-cubo x.
+            # Reutiliza el mismo patrón bit a bit que j_local, vectorizado sobre estados.
+            # Necesario cuando |dims_local| < m: tensor vive en 2^|dims_local|,
+            # pero costos_j y states_d operan en el espacio global 2^m.
+            estados_local = np.zeros(S, dtype=np.int32)
+            for pos_local, d in enumerate(dims_local):
+                bit_col        = (estados >> pos_global[d]) & 1
+                estados_local |= (bit_col << pos_local)
 
             diff          = estados ^ j
             dist          = popcount[diff]
-            costo_directo = np.abs(tensor - tensor[j_local])
+            costo_directo = np.abs(tensor[estados_local] - tensor[j_local])
 
             for d in range(1, self.m + 1):
                 gamma    = 2.0 ** (-d)
@@ -161,25 +166,53 @@ class GeometricSIA(SIA):
 
     def _identificar_candidatos(self, tabla: List[np.ndarray]) -> list:
         """
-        Identifica candidatos desde el vector de costos hacia j_actual.
-        - top-k estados de menor costo por variable (cobertura geométrica)
-        - corte total con mecanismo vacío (∅)
-        - pares simples (x | b) para cobertura estructural sistemática
+        Identifica candidatos desde el vector de costos hacia j_actual
+        mediante análisis de complementariedad geométrica mínima.
+
+        Los estados con costo mínimo de transición hacia j_actual representan
+        configuraciones estructuralmente más cercanas en el hipercubo. El XOR
+        entre el estado candidato y j_actual define directamente las variables
+        del mecanismo que participan en la bipartición (GeoMIP §4.2.4).
+
+        La selección usa tolerancia relativa (np.isclose) para capturar empates
+        reales independientemente de la escala de los datos: el umbral efectivo
+        escala con |costo_min|, evitando tanto falsos empates (tolerancia fija
+        grande sobre costos pequeños) como empates omitidos (tolerancia fija
+        pequeña sobre costos grandes).
+
+        En sistemas geométricamente degenerados (distribuciones casi uniformes),
+        donde más de m+1 estados alcanzan el mínimo, se aplica un filtro
+        secundario por distancia Hamming mínima a j_actual: en el hipercubo
+        m-dimensional, los m vecinos inmediatos son las únicas referencias
+        topológicas no arbitrarias.
         """
-        indices = self.sia_subsistema.indices_ncubos
-        dims    = self.sia_subsistema.dims_ncubos
-        j       = self._j_actual
+        indices    = self.sia_subsistema.indices_ncubos
+        dims       = self.sia_subsistema.dims_ncubos
+        j          = self._j_actual
         candidatos = set()
 
         for x in range(self.n):
             costos    = tabla[x].copy()
             costos[j] = np.inf
 
-            # Top-5 estados de menor costo → candidatos geométricos
-            k      = min(5, costos.size - 1)
-            top_k  = np.argpartition(costos, k)[:k]
+            # Empates reales por complementariedad geométrica (tolerancia relativa)
+            # |costos - costo_min| <= atol + rtol * |costo_min|
+            # atol=1e-15 cubre el caso costo_min≈0 (ε_machine); rtol escala con la magnitud
+            costo_min   = costos.min()
+            estados_min = np.where(
+                np.isclose(costos, costo_min, rtol=1e-9, atol=1e-15)
+            )[0]
 
-            for i_cand in top_k:
+            # Filtro secundario por distancia Hamming mínima en degeneración geométrica.
+            # Umbral m+1: en un hipercubo m-dimensional exactamente m vértices están
+            # a distancia 1 de j; más de m+1 empates implican degeneración.
+            if estados_min.size > self.m + 1:
+                hamming     = np.array(
+                    [bin(int(i) ^ j).count('1') for i in estados_min], dtype=np.int32
+                )
+                estados_min = estados_min[hamming == hamming.min()]
+
+            for i_cand in estados_min:
                 mascara = int(i_cand) ^ j
                 if mascara == 0:
                     continue
