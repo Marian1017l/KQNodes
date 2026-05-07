@@ -196,7 +196,7 @@ class GeometricSIA(SIA):
             dist_particion = particion.distribucion_marginal()
             phi            = self.distancia_metrica(dist_particion, self.sia_dists_marginales)
 
-            print("Candidato:", sub_alcance, sub_mecanismo, "phi=", phi)
+            #print("Candidato:", sub_alcance, sub_mecanismo, "phi=", phi)
             if phi < mejor_phi:
                 mejor_phi  = phi
                 mejor_dist = dist_particion
