@@ -355,6 +355,7 @@ class QNodes(SIA):
         )
         vector_union_marginal = particion_union.distribucion_marginal()
         emd_union = emd_efecto(vector_union_marginal, self.sia_dists_marginales)
+        del particion_union, vector_union_marginal
 
         return emd_union, emd_delta
 
