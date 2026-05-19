@@ -324,21 +324,14 @@ class QNodes(SIA):
             )
             Esto lo hice así para hacer almacenamiento externo de la emd individual y su distribución marginal en las particiones candidatas.
         """
-        vector_delta_marginal = None
-        clave_submodular = [], []
-
         # Delta #
 
-        clave_delta_actual, clave_delta_efecto = self.definir_clave(deltas, clave_submodular)
-        clave_delta = tuple(clave_delta_actual), tuple(clave_delta_efecto)
-
-        idxs_alcance_delta = clave_submodular[EFFECT]
-        dims_mecanismo_delta = clave_submodular[ACTUAL]
+        clave_delta = self.definir_clave([deltas])
 
         if clave_delta not in self.memoria_delta:
             particion_delta = self.sia_subsistema.bipartir(
-                np.array(idxs_alcance_delta, dtype=np.int8),
-                np.array(dims_mecanismo_delta, dtype=np.int8),
+                np.array(clave_delta[EFFECT], dtype=np.int8),
+                np.array(clave_delta[ACTUAL], dtype=np.int8),
             )
             vector_delta_marginal = particion_delta.distribucion_marginal()
             emd_delta = emd_efecto(vector_delta_marginal, self.sia_dists_marginales)
@@ -349,35 +342,27 @@ class QNodes(SIA):
 
         # Unión #
 
-        for omega in omegas:
-            self.definir_clave(omega, clave_submodular)
-
-        idxs_alcance_union = clave_submodular[EFFECT]
-        dims_mecanismo_union = clave_submodular[ACTUAL]
+        clave_union = self.definir_clave([deltas] + omegas)
 
         particion_union = self.sia_subsistema.bipartir(
-            np.array(idxs_alcance_union, dtype=np.int8),
-            np.array(dims_mecanismo_union, dtype=np.int8),
+            np.array(clave_union[EFFECT], dtype=np.int8),
+            np.array(clave_union[ACTUAL], dtype=np.int8),
         )
         vector_union_marginal = particion_union.distribucion_marginal()
         emd_union = emd_efecto(vector_union_marginal, self.sia_dists_marginales)
 
         return emd_union, emd_delta, vector_delta_marginal
 
+    @staticmethod
     def definir_clave(
-        self,
-        conjunto: Union[tuple[int, int], list[tuple[int, int]]],
-        clave_submodular: tuple[list, list],
-    ):
-        if isinstance(conjunto, tuple):
-            tiempo, indice = conjunto
-            clave_submodular[tiempo].append(indice)
-        else:
-            for tiempo, indice in conjunto:
-                clave_submodular[tiempo].append(indice)
-        clave_submodular[ACTUAL].sort()
-        clave_submodular[EFFECT].sort()
-        return clave_submodular
+        conjuntos: list[Union[tuple[int, int], list[tuple[int, int]]]]
+    ) -> tuple[tuple, tuple]:
+        actual, efecto = [], []
+        for conjunto in conjuntos:
+            pares = [conjunto] if isinstance(conjunto, tuple) else conjunto
+            for tiempo, indice in pares:
+                (actual if tiempo == ACTUAL else efecto).append(indice)
+        return tuple(sorted(actual)), tuple(sorted(efecto))
 
     def nodes_complement(self, nodes: list[tuple[int, int]]):
         return list(set(self.vertices) - set(nodes))
