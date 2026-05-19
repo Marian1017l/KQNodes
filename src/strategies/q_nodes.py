@@ -148,6 +148,7 @@ class QNodes(SIA):
 
         vertices = list(presente + futuro)
         self.vertices = set(presente + futuro)
+        self.memoria_delta = {}
         mip = self.algorithm(vertices)
 
         fmt_mip = fmt_biparticion_q(list(mip), self.nodes_complement(mip))
@@ -326,12 +327,15 @@ class QNodes(SIA):
         """
         # Delta #
 
-        clave_delta = self.definir_clave([deltas])
+        nodos_delta = [deltas] if isinstance(deltas, tuple) else deltas
+        mask_da, mask_de = QNodes._nodos_a_bitmask(nodos_delta)
+        clave_delta = (mask_da, mask_de)
+        dims_mecanismo_delta, idxs_alcance_delta = QNodes._bitmask_a_indices(mask_da, mask_de)
 
         if clave_delta not in self.memoria_delta:
             particion_delta = self.sia_subsistema.bipartir(
-                np.array(clave_delta[EFFECT], dtype=np.int8),
-                np.array(clave_delta[ACTUAL], dtype=np.int8),
+                np.array(idxs_alcance_delta, dtype=np.int8),
+                np.array(dims_mecanismo_delta, dtype=np.int8),
             )
             vector_delta_marginal = particion_delta.distribucion_marginal()
             emd_delta = emd_efecto(vector_delta_marginal, self.sia_dists_marginales)
