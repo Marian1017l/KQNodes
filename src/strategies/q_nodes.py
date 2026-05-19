@@ -109,6 +109,7 @@ class QNodes(SIA):
         self.etiquetas = [tuple(s.lower() for s in ABECEDARY), ABECEDARY]
         self.vertices: set[tuple]
         self.memoria_delta = {}
+        self.memoria_union = {}
         self.memoria_grupo_candidato = {}
 
         self.indices_alcance: np.ndarray
@@ -149,6 +150,7 @@ class QNodes(SIA):
         vertices = list(presente + futuro)
         self.vertices = set(presente + futuro)
         self.memoria_delta = {}
+        self.memoria_union = {}
         mip = self.algorithm(vertices)
 
         fmt_mip = fmt_biparticion_q(list(mip), self.nodes_complement(mip))
@@ -349,13 +351,17 @@ class QNodes(SIA):
 
         clave_union = self.definir_clave([deltas] + omegas)
 
-        particion_union = self.sia_subsistema.bipartir(
-            np.array(clave_union[EFFECT], dtype=np.int8),
-            np.array(clave_union[ACTUAL], dtype=np.int8),
-        )
-        vector_union_marginal = particion_union.distribucion_marginal()
-        emd_union = emd_efecto(vector_union_marginal, self.sia_dists_marginales)
-        del particion_union, vector_union_marginal
+        if clave_union not in self.memoria_union:
+            particion_union = self.sia_subsistema.bipartir(
+                np.array(clave_union[EFFECT], dtype=np.int8),
+                np.array(clave_union[ACTUAL], dtype=np.int8),
+            )
+            vector_union_marginal = particion_union.distribucion_marginal()
+            emd_union = emd_efecto(vector_union_marginal, self.sia_dists_marginales)
+            self.memoria_union[clave_union] = emd_union
+            del particion_union, vector_union_marginal
+        else:
+            emd_union = self.memoria_union[clave_union]
 
         return emd_union, emd_delta
 
@@ -422,3 +428,4 @@ class QNodes(SIA):
         indices_actual = [i for i in range(mask_actual.bit_length()) if (mask_actual >> i) & 1]
         indices_efecto = [i for i in range(mask_efecto.bit_length()) if (mask_efecto >> i) & 1]
         return indices_actual, indices_efecto
+
