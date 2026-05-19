@@ -179,6 +179,9 @@ uv.lock
 # PyPI configuration file
 .pypirc
 
+# Large sample files
+src/.samples/N22A.csv
+
 # Archive files
 .archive
 .archive/

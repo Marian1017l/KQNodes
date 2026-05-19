@@ -396,7 +396,7 @@ class QNodes(SIA):
                 mask_actual |= 1 << indice
             else:
                 mask_efecto |= 1 << indice
-        return mask_actual, mask_efecto
+        return int(mask_actual), int(mask_efecto)
 
     @staticmethod
     def _bitmask_a_indices(mask_actual: int, mask_efecto: int) -> tuple[list[int], list[int]]:
