@@ -1,5 +1,5 @@
 import traceback
-
+import time
 from src.controllers.manager import Manager
 from src.strategies.q_nodes import QNodes
 
@@ -8,7 +8,7 @@ from src.strategies.q_nodes import QNodes
 # Cada entrada: (id, estado_inicial, condiciones, alcance, mecanismo)
 # ---------------------------------------------------------------------------
 PRUEBAS = [
-    (1, "10000000000000000000", "11111111111111111111", "11111111111111111100", "11011011011011011011"),
+    (1, "1000000000000000000000", "1111111111111111111111", "1111111111111111110011", "1101101101101101101100"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -28,6 +28,7 @@ def asegurar_red(estado_inicial: str) -> None:
 
 
 def correr_estrategia(clase, tpm, estado_inicial, condiciones, alcance, mecanismo):
+    t0 = time.time()
     try:
         instancia = clase(tpm)
         resultado = instancia.aplicar_estrategia(
@@ -36,6 +37,8 @@ def correr_estrategia(clase, tpm, estado_inicial, condiciones, alcance, mecanism
         print(resultado)
     except Exception:
         traceback.print_exc()
+    finally:
+        print(f"Tiempo total (incluyendo setup): {time.time() - t0:.2f}s")
 
 
 def ejecutar():

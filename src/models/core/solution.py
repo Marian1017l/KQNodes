@@ -263,9 +263,9 @@ class Solution:
         tipo_distribucion = "tensorial" if es_pyphi else "marginal"
 
         tiempo_hrs, tiempo_min, tiempo_seg = (
-            f"{self.tiempo_ejecucion / 3600:.2f}",
-            f"{self.tiempo_ejecucion / 60:.1f}",
-            f"{self.tiempo_ejecucion:.4f}",
+            f"{int(self.tiempo_ejecucion // 3600)}",
+            f"{int((self.tiempo_ejecucion % 3600) // 60)}",
+            f"{self.tiempo_ejecucion % 60:.4f}",
         )
         return f"""{Fore.CYAN}{bilinea}
 
