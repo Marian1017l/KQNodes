@@ -366,3 +366,53 @@ class QNodes(SIA):
 
     def nodes_complement(self, nodes: list[tuple[int, int]]):
         return list(set(self.vertices) - set(nodes))
+
+    @staticmethod
+    def _nodos_a_bitmask(nodos: list[tuple[int, int]]) -> tuple[int, int]:
+        """Convierte una lista de nodos (tiempo, indice) a un par de bitmasks.
+
+        Cada nodo activa el bit `indice` en la máscara correspondiente a su tiempo.
+
+        Ejemplos:
+            >>> QNodes._nodos_a_bitmask([])
+            (0, 0)
+            >>> QNodes._nodos_a_bitmask([(ACTUAL, 0), (ACTUAL, 2)])
+            (5, 0)   # 0b101 = 1 + 4
+            >>> QNodes._nodos_a_bitmask([(EFFECT, 1), (EFFECT, 3)])
+            (0, 10)  # 0b1010 = 2 + 8
+            >>> QNodes._nodos_a_bitmask([(ACTUAL, 0), (EFFECT, 1), (ACTUAL, 3)])
+            (9, 2)   # mask_actual=0b1001=9, mask_efecto=0b10=2
+        """
+        mask_actual = 0
+        mask_efecto = 0
+        for tiempo, indice in nodos:
+            if tiempo == ACTUAL:
+                mask_actual |= 1 << indice
+            else:
+                mask_efecto |= 1 << indice
+        return mask_actual, mask_efecto
+
+    @staticmethod
+    def _bitmask_a_indices(mask_actual: int, mask_efecto: int) -> tuple[list[int], list[int]]:
+        """Extrae los índices de los bits encendidos en cada bitmask.
+
+        Recorre los bits de menor a mayor peso; un bit encendido en la posición i
+        significa que el nodo con índice i está activo en ese tiempo.
+
+        Ejemplos:
+            >>> QNodes._bitmask_a_indices(0, 0)
+            ([], [])
+            >>> QNodes._bitmask_a_indices(5, 0)
+            ([0, 2], [])   # 5 = 0b101 → bits 0 y 2
+            >>> QNodes._bitmask_a_indices(0, 10)
+            ([], [1, 3])   # 10 = 0b1010 → bits 1 y 3
+            >>> QNodes._bitmask_a_indices(9, 2)
+            ([0, 3], [1])  # 9=0b1001 → bits 0,3 ; 2=0b10 → bit 1
+
+        Propiedad de inversión:
+            _bitmask_a_indices(*_nodos_a_bitmask(nodos)) retorna los mismos índices
+            ordenados de menor a mayor que aparecen en nodos, agrupados por tiempo.
+        """
+        indices_actual = [i for i in range(mask_actual.bit_length()) if (mask_actual >> i) & 1]
+        indices_efecto = [i for i in range(mask_efecto.bit_length()) if (mask_efecto >> i) & 1]
+        return indices_actual, indices_efecto
