@@ -1,17 +1,14 @@
 import traceback
 
 from src.controllers.manager import Manager
-from src.strategies.force import BruteForce
 from src.strategies.q_nodes import QNodes
-from src.strategies.geometric import GeometricSIA
-from src.strategies.phi import Phi
 
 # ---------------------------------------------------------------------------
 # Casos de prueba
 # Cada entrada: (id, estado_inicial, condiciones, alcance, mecanismo)
 # ---------------------------------------------------------------------------
 PRUEBAS = [
-    (1, "100000000000000", "111111111101010", "111111111111100", "110110110110101"),
+    (1, "10000000000000000000", "11111111111111111111", "11111111111111111100", "11011011011011011011"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -19,10 +16,15 @@ PRUEBAS = [
 # Cada entrada: (nombre_columna, clase, habilitada)
 # ---------------------------------------------------------------------------
 ESTRATEGIAS = [
-    ("QNodes",     QNodes,       True),
-    ("Geometrica", GeometricSIA, True),
-    ("Pyphi",      Phi,          True),
+    ("QNodes", QNodes, True),
 ]
+
+
+def asegurar_red(estado_inicial: str) -> None:
+    gestor = Manager(estado_inicial)
+    if not gestor.tpm_filename.exists():
+        print(f"Generando red N{len(estado_inicial)}... (esto puede tardar)")
+        gestor.generar_red(len(estado_inicial))
 
 
 def correr_estrategia(clase, tpm, estado_inicial, condiciones, alcance, mecanismo):
@@ -42,6 +44,7 @@ def ejecutar():
     for prueba in PRUEBAS:
         _, estado_inicial, condiciones, alcance, mecanismo = prueba
 
+        asegurar_red(estado_inicial)
         gestor = Manager(estado_inicial)
         tpm    = gestor.cargar_red()
 
