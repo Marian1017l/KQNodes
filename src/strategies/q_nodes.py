@@ -152,7 +152,14 @@ class QNodes(SIA):
         mip = self.algorithm(vertices)
 
         fmt_mip = fmt_biparticion_q(list(mip), self.nodes_complement(mip))
-        perdida_mip, dist_marginal_mip = self.memoria_grupo_candidato[mip]
+        perdida_mip = self.memoria_grupo_candidato[mip]
+
+        clave_mip = self.definir_clave(list(mip))
+        particion_mip = self.sia_subsistema.bipartir(
+            np.array(clave_mip[EFFECT], dtype=np.int8),
+            np.array(clave_mip[ACTUAL], dtype=np.int8),
+        )
+        dist_marginal_mip = particion_mip.distribucion_marginal()
 
         return Solution(
             estrategia=QNODES_LABEL,
@@ -216,15 +223,12 @@ class QNodes(SIA):
         Returns:
             tuple[float, tuple[tuple[int, int], ...]]: El valor de pérdida en la primera posición, asociado con la partición óptima encontrada, identificada por la clave en partition_memory que produce la menor EMD.
         """
-        indice_emd = INT_ZERO
-
         for i in range(len(vertices) - 1):
             # self.logger.debug(f"total: {len(vertices) - i}")
             omegas_ciclo = [vertices[0]]
             deltas_ciclo = vertices[1:]
 
             emd_particion_candidata = INFTY_POS
-            dist_particion_candidata = None
 
             for j in range(len(deltas_ciclo) - 1):
                 # self.logger.critic(f"   {j=}")
@@ -232,7 +236,7 @@ class QNodes(SIA):
                 indice_mip: int
 
                 for k in range(len(deltas_ciclo)):
-                    emd_union, emd_delta, dist_marginal_delta = self.funcion_submodular(
+                    emd_union, emd_delta = self.funcion_submodular(
                         deltas_ciclo[k], omegas_ciclo
                     )
 
@@ -245,16 +249,12 @@ class QNodes(SIA):
                                 if isinstance(deltas_ciclo[k], list)
                                 else (deltas_ciclo[k],)
                             )
-                            self.memoria_grupo_candidato[clave] = (
-                                emd_delta,
-                                dist_marginal_delta,
-                            )
+                            self.memoria_grupo_candidato[clave] = emd_delta
                             return clave
 
                         emd_local = emd_iteracion
                         indice_mip = k
                         emd_particion_candidata = emd_delta
-                        dist_particion_candidata = dist_marginal_delta
                 # self.logger.critic(f"       [k]: {indice_mip}")
 
                 omegas_ciclo.append(deltas_ciclo[indice_mip])
@@ -265,7 +265,7 @@ class QNodes(SIA):
                     if isinstance(deltas_ciclo[LAST_IDX], list)
                     else deltas_ciclo
                 )
-            ] = emd_particion_candidata, dist_particion_candidata
+            ] = emd_particion_candidata
 
             par_candidato = (
                 [omegas_ciclo[LAST_IDX]]
@@ -284,7 +284,7 @@ class QNodes(SIA):
 
         return min(
             self.memoria_grupo_candidato,
-            key=lambda k: self.memoria_grupo_candidato[k][indice_emd],
+            key=lambda k: self.memoria_grupo_candidato[k],
         )
 
     def funcion_submodular(
@@ -339,10 +339,11 @@ class QNodes(SIA):
             )
             vector_delta_marginal = particion_delta.distribucion_marginal()
             emd_delta = emd_efecto(vector_delta_marginal, self.sia_dists_marginales)
-            self.memoria_delta[clave_delta] = emd_delta, vector_delta_marginal
+            self.memoria_delta[clave_delta] = emd_delta
+            del vector_delta_marginal, particion_delta
 
         else:
-            emd_delta, vector_delta_marginal = self.memoria_delta[clave_delta]
+            emd_delta = self.memoria_delta[clave_delta]
 
         # Unión #
 
@@ -355,7 +356,7 @@ class QNodes(SIA):
         vector_union_marginal = particion_union.distribucion_marginal()
         emd_union = emd_efecto(vector_union_marginal, self.sia_dists_marginales)
 
-        return emd_union, emd_delta, vector_delta_marginal
+        return emd_union, emd_delta
 
     @staticmethod
     def definir_clave(
