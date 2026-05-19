@@ -108,7 +108,6 @@ class QNodes(SIA):
         self.tiempos: tuple[np.ndarray, np.ndarray]
         self.etiquetas = [tuple(s.lower() for s in ABECEDARY), ABECEDARY]
         self.vertices: set[tuple]
-        self.clave_submodular = [], []
         self.memoria_delta = {}
         self.memoria_grupo_candidato = {}
 
@@ -326,15 +325,15 @@ class QNodes(SIA):
             Esto lo hice así para hacer almacenamiento externo de la emd individual y su distribución marginal en las particiones candidatas.
         """
         vector_delta_marginal = None
-        self.clave_submodular = [], []
+        clave_submodular = [], []
 
         # Delta #
 
-        clave_delta_actual, clave_delta_efecto = self.definir_clave(deltas)
+        clave_delta_actual, clave_delta_efecto = self.definir_clave(deltas, clave_submodular)
         clave_delta = tuple(clave_delta_actual), tuple(clave_delta_efecto)
 
-        idxs_alcance_delta = self.clave_submodular[EFFECT]
-        dims_mecanismo_delta = self.clave_submodular[ACTUAL]
+        idxs_alcance_delta = clave_submodular[EFFECT]
+        dims_mecanismo_delta = clave_submodular[ACTUAL]
 
         if clave_delta not in self.memoria_delta:
             particion_delta = self.sia_subsistema.bipartir(
@@ -351,10 +350,10 @@ class QNodes(SIA):
         # Unión #
 
         for omega in omegas:
-            self.definir_clave(omega)
+            self.definir_clave(omega, clave_submodular)
 
-        idxs_alcance_union = self.clave_submodular[EFFECT]
-        dims_mecanismo_union = self.clave_submodular[ACTUAL]
+        idxs_alcance_union = clave_submodular[EFFECT]
+        dims_mecanismo_union = clave_submodular[ACTUAL]
 
         particion_union = self.sia_subsistema.bipartir(
             np.array(idxs_alcance_union, dtype=np.int8),
@@ -368,16 +367,17 @@ class QNodes(SIA):
     def definir_clave(
         self,
         conjunto: Union[tuple[int, int], list[tuple[int, int]]],
+        clave_submodular: tuple[list, list],
     ):
         if isinstance(conjunto, tuple):
             tiempo, indice = conjunto
-            self.clave_submodular[tiempo].append(indice)
+            clave_submodular[tiempo].append(indice)
         else:
             for tiempo, indice in conjunto:
-                self.clave_submodular[tiempo].append(indice)
-        self.clave_submodular[ACTUAL].sort()
-        self.clave_submodular[EFFECT].sort()
-        return self.clave_submodular
+                clave_submodular[tiempo].append(indice)
+        clave_submodular[ACTUAL].sort()
+        clave_submodular[EFFECT].sort()
+        return clave_submodular
 
     def nodes_complement(self, nodes: list[tuple[int, int]]):
         return list(set(self.vertices) - set(nodes))
