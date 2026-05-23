@@ -346,12 +346,21 @@ class QNodes(SIA):
 
         # Unión #
 
-        clave_union = self.definir_clave([deltas] + omegas)
+        mask_ua, mask_ue = mask_da, mask_de
+        for omega in omegas:
+            nodos_omega = [omega] if isinstance(omega, tuple) else omega
+            for tiempo, indice in nodos_omega:
+                if tiempo == ACTUAL:
+                    mask_ua |= 1 << int(indice)
+                else:
+                    mask_ue |= 1 << int(indice)
+        clave_union = (mask_ua, mask_ue)
+        dims_mecanismo_union, idxs_alcance_union = QNodes._bitmask_a_indices(mask_ua, mask_ue)
 
         if clave_union not in self.memoria_union:
             particion_union = self.sia_subsistema.bipartir(
-                np.array(clave_union[EFFECT], dtype=np.int8),
-                np.array(clave_union[ACTUAL], dtype=np.int8),
+                np.array(idxs_alcance_union, dtype=np.int8),
+                np.array(dims_mecanismo_union, dtype=np.int8),
             )
             vector_union_marginal = particion_union.distribucion_marginal()
             emd_union = emd_efecto(vector_union_marginal, self.sia_dists_marginales)
