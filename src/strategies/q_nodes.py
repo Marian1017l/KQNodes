@@ -1,10 +1,6 @@
-import os
 import time
-from concurrent.futures import ThreadPoolExecutor
 from typing import Union
 import numpy as np
-
-_N_WORKERS = min(os.cpu_count() or 1, 16)
 from src.middlewares.slogger import SafeLogger
 from src.funcs.iit import emd_efecto, ABECEDARY
 from src.middlewares.profile import gestor_perfilado, profile
@@ -229,66 +225,61 @@ class QNodes(SIA):
         Returns:
             tuple[float, tuple[tuple[int, int], ...]]: El valor de pérdida en la primera posición, asociado con la partición óptima encontrada, identificada por la clave en partition_memory que produce la menor EMD.
         """
-        with ThreadPoolExecutor(max_workers=_N_WORKERS) as executor:
-            for _ in range(len(vertices) - 1):
-                omegas_ciclo = [vertices[0]]
-                deltas_ciclo = vertices[1:]
+        for i in range(len(vertices) - 1):
+            omegas_ciclo = [vertices[0]]
+            deltas_ciclo = vertices[1:]
 
-                emd_particion_candidata = INFTY_POS
+            emd_particion_candidata = INFTY_POS
 
-                for _ in range(len(deltas_ciclo) - 1):
-                    emd_local = 1e5
-                    indice_mip: int
+            for _ in range(len(deltas_ciclo) - 1):
+                emd_local = 1e5
+                indice_mip: int
 
-                    n = len(deltas_ciclo)
-                    resultados_k = executor.map(
-                        self.funcion_submodular,
-                        deltas_ciclo,
-                        [omegas_ciclo] * n,
+                for k in range(len(deltas_ciclo)):
+                    emd_union, emd_delta = self.funcion_submodular(
+                        deltas_ciclo[k], omegas_ciclo
                     )
+                    emd_iteracion = emd_union - emd_delta
 
-                    for k, (emd_union, emd_delta) in enumerate(resultados_k):
-                        emd_iteracion = emd_union - emd_delta
+                    if emd_iteracion < emd_local:
+                        if emd_delta == INT_ZERO:
+                            clave = (
+                                tuple(deltas_ciclo[k])
+                                if isinstance(deltas_ciclo[k], list)
+                                else (deltas_ciclo[k],)
+                            )
+                            self.memoria_grupo_candidato[clave] = emd_delta
+                            return clave
 
-                        if emd_iteracion < emd_local:
-                            if emd_delta == INT_ZERO:
-                                clave = (
-                                    tuple(deltas_ciclo[k])
-                                    if isinstance(deltas_ciclo[k], list)
-                                    else (deltas_ciclo[k],)
-                                )
-                                self.memoria_grupo_candidato[clave] = emd_delta
-                                return clave
+                        emd_local = emd_iteracion
+                        indice_mip = k
+                        emd_particion_candidata = emd_delta
 
-                            emd_local = emd_iteracion
-                            indice_mip = k
-                            emd_particion_candidata = emd_delta
+                omegas_ciclo.append(deltas_ciclo[indice_mip])
+                deltas_ciclo.pop(indice_mip)
 
-                    omegas_ciclo.append(deltas_ciclo[indice_mip])
-                    deltas_ciclo.pop(indice_mip)
-
-                self.memoria_grupo_candidato[
-                    tuple(
-                        deltas_ciclo[LAST_IDX]
-                        if isinstance(deltas_ciclo[LAST_IDX], list)
-                        else deltas_ciclo
-                    )
-                ] = emd_particion_candidata
-
-                par_candidato = (
-                    [omegas_ciclo[LAST_IDX]]
-                    if isinstance(omegas_ciclo[LAST_IDX], tuple)
-                    else omegas_ciclo[LAST_IDX]
-                ) + (
+            self.memoria_grupo_candidato[
+                tuple(
                     deltas_ciclo[LAST_IDX]
                     if isinstance(deltas_ciclo[LAST_IDX], list)
                     else deltas_ciclo
                 )
+            ] = emd_particion_candidata
 
-                omegas_ciclo.pop()
-                omegas_ciclo.append(par_candidato)
+            par_candidato = (
+                [omegas_ciclo[LAST_IDX]]
+                if isinstance(omegas_ciclo[LAST_IDX], tuple)
+                else omegas_ciclo[LAST_IDX]
+            ) + (
+                deltas_ciclo[LAST_IDX]
+                if isinstance(deltas_ciclo[LAST_IDX], list)
+                else deltas_ciclo
+            )
 
-                vertices = omegas_ciclo
+            omegas_ciclo.pop()
+            omegas_ciclo.append(par_candidato)
+
+            vertices = omegas_ciclo
 
         return min(
             self.memoria_grupo_candidato,
