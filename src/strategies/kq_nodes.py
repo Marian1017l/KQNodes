@@ -109,8 +109,12 @@ class KQNodes(SIA):
 
             if len(sub_vertices) == 2:  # Bug D: bipartición directa sin pasar por algorithm
                 v0, v1 = sub_vertices
-                _, phi_v0 = self.funcion_submodular(v0, [v1])
-                _, phi_v1 = self.funcion_submodular(v1, [v0])
+                nodos_v0 = [v0] if isinstance(v0, tuple) else v0
+                nodos_v1 = [v1] if isinstance(v1, tuple) else v1
+                mask_v0_a, mask_v0_e = KQNodes._nodos_a_bitmask(nodos_v0)
+                mask_v1_a, mask_v1_e = KQNodes._nodos_a_bitmask(nodos_v1)
+                _, phi_v0 = self.funcion_submodular(v0, mask_v1_a, mask_v1_e)
+                _, phi_v1 = self.funcion_submodular(v1, mask_v0_a, mask_v0_e)
                 if phi_v0 <= phi_v1:
                     phi_mip, mip_flat, complemento = phi_v0, [v0], [v1]
                 else:
@@ -159,6 +163,10 @@ class KQNodes(SIA):
             omegas_ciclo = [vertices[0]]
             deltas_ciclo = vertices[1:]
 
+            # P0-2: máscara acumulada de omega; se inicializa con vertices[0] y crece con cada delta ganador
+            v0_nodos = [vertices[0]] if isinstance(vertices[0], tuple) else vertices[0]
+            omega_mask_a, omega_mask_e = KQNodes._nodos_a_bitmask(v0_nodos)
+
             emd_particion_candidata = INFTY_POS
 
             for _ in range(len(deltas_ciclo) - 1):
@@ -167,7 +175,7 @@ class KQNodes(SIA):
 
                 for k in range(len(deltas_ciclo)):
                     emd_union, emd_delta = self.funcion_submodular(
-                        deltas_ciclo[k], omegas_ciclo
+                        deltas_ciclo[k], omega_mask_a, omega_mask_e
                     )
                     emd_iteracion = emd_union - emd_delta
 
@@ -185,7 +193,16 @@ class KQNodes(SIA):
                         indice_mip = k
                         emd_particion_candidata = emd_delta
 
-                omegas_ciclo.append(deltas_ciclo[indice_mip])
+                # Actualizar máscara ANTES de mover el ganador a omegas
+                ganador = deltas_ciclo[indice_mip]
+                ganador_nodos = [ganador] if isinstance(ganador, tuple) else ganador
+                for tiempo, indice in ganador_nodos:
+                    if tiempo == ACTUAL:
+                        omega_mask_a |= 1 << int(indice)
+                    else:
+                        omega_mask_e |= 1 << int(indice)
+
+                omegas_ciclo.append(ganador)
                 deltas_ciclo.pop(indice_mip)
 
             self.memoria_grupo_candidato[
@@ -217,9 +234,12 @@ class KQNodes(SIA):
         )
 
     def funcion_submodular(
-        self, deltas: Union[tuple, list[tuple]], omegas: list[Union[tuple, list[tuple]]]
+        self, deltas: Union[tuple, list[tuple]], omega_mask_a: int, omega_mask_e: int
     ):
-        """Calcula (emd_union, emd_delta): EMD de delta solo y de delta∪omega, con caché por bitmask."""
+        """Calcula (emd_union, emd_delta) con caché por bitmask.
+
+        omega_mask_a/e: bitmask acumulado del conjunto omega, mantenido incrementalmente por el caller (P0-2).
+        """
         # Delta #
         nodos_delta = [deltas] if isinstance(deltas, tuple) else deltas
         mask_da, mask_de = KQNodes._nodos_a_bitmask(nodos_delta)
@@ -238,19 +258,13 @@ class KQNodes(SIA):
         else:
             emd_delta = self.memoria_delta[clave_delta]
 
-        # Unión #
-        mask_ua, mask_ue = mask_da, mask_de
-        for omega in omegas:
-            nodos_omega = [omega] if isinstance(omega, tuple) else omega
-            for tiempo, indice in nodos_omega:
-                if tiempo == ACTUAL:
-                    mask_ua |= 1 << int(indice)
-                else:
-                    mask_ue |= 1 << int(indice)
-        clave_union = (mask_ua, mask_ue)
+        # Unión: P0-2 — OR directo; omega_mask ya viene acumulado por el caller #
+        clave_union = (mask_da | omega_mask_a, mask_de | omega_mask_e)
 
         if clave_union not in self.memoria_union:
-            dims_mecanismo_union, idxs_alcance_union = KQNodes._bitmask_a_indices(mask_ua, mask_ue)
+            dims_mecanismo_union, idxs_alcance_union = KQNodes._bitmask_a_indices(
+                clave_union[0], clave_union[1]
+            )
             particion_union = self.sia_subsistema.bipartir(
                 np.array(idxs_alcance_union, dtype=np.int8),
                 np.array(dims_mecanismo_union, dtype=np.int8),
