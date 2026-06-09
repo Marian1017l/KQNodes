@@ -211,9 +211,9 @@ class KQNodes(SIA):
         nodos_delta = [deltas] if isinstance(deltas, tuple) else deltas
         mask_da, mask_de = KQNodes._nodos_a_bitmask(nodos_delta)
         clave_delta = (mask_da, mask_de)
-        dims_mecanismo_delta, idxs_alcance_delta = KQNodes._bitmask_a_indices(mask_da, mask_de)
 
         if clave_delta not in self.memoria_delta:
+            dims_mecanismo_delta, idxs_alcance_delta = KQNodes._bitmask_a_indices(mask_da, mask_de)
             particion_delta = self.sia_subsistema.bipartir(
                 np.array(idxs_alcance_delta, dtype=np.int8),
                 np.array(dims_mecanismo_delta, dtype=np.int8),
@@ -235,9 +235,9 @@ class KQNodes(SIA):
                 else:
                     mask_ue |= 1 << int(indice)
         clave_union = (mask_ua, mask_ue)
-        dims_mecanismo_union, idxs_alcance_union = KQNodes._bitmask_a_indices(mask_ua, mask_ue)
 
         if clave_union not in self.memoria_union:
+            dims_mecanismo_union, idxs_alcance_union = KQNodes._bitmask_a_indices(mask_ua, mask_ue)
             particion_union = self.sia_subsistema.bipartir(
                 np.array(idxs_alcance_union, dtype=np.int8),
                 np.array(dims_mecanismo_union, dtype=np.int8),
