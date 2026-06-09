@@ -4,7 +4,7 @@ import numpy as np
 from src.middlewares.slogger import SafeLogger
 from src.funcs.iit import emd_efecto, ABECEDARY
 from src.middlewares.profile import gestor_perfilado, profile
-from src.funcs.format import fmt_parte_q
+from src.funcs.format import fmt_biparticion_q, fmt_parte_q
 from src.models.base.sia import SIA
 
 from src.models.core.solution import Solution
@@ -104,27 +104,40 @@ class KQNodes(SIA):
             idx_mayor = max(range(len(grupos)), key=lambda i: len(grupos[i]))
             sub_vertices = grupos[idx_mayor]
 
-            self.vertices = set(sub_vertices)
-            self.memoria_grupo_candidato = {}
+            if len(sub_vertices) <= 1:  # Bug C: no se puede bipartir un grupo de ≤1 vértice
+                continue
 
-            mip = self.algorithm(sub_vertices)
-            phi_mip = self.memoria_grupo_candidato[mip]
-            phi_total += phi_mip
+            if len(sub_vertices) == 2:  # Bug D: bipartición directa sin pasar por algorithm
+                v0, v1 = sub_vertices
+                _, phi_v0 = self.funcion_submodular(v0, [v1])
+                _, phi_v1 = self.funcion_submodular(v1, [v0])
+                if phi_v0 <= phi_v1:
+                    phi_mip, mip_flat, complemento = phi_v0, [v0], [v1]
+                else:
+                    phi_mip, mip_flat, complemento = phi_v1, [v1], [v0]
+                clave = self.definir_clave(mip_flat)
+            else:
+                self.vertices = set(sub_vertices)
+                self.memoria_grupo_candidato = {}
 
-            clave = self.definir_clave(list(mip))
+                mip = self.algorithm(sub_vertices)
+                phi_mip = self.memoria_grupo_candidato[mip]
+
+                clave = self.definir_clave(list(mip))
+                mip_flat = KQNodes._flatten_grupo(list(mip))
+                mip_set = set(mip_flat)
+                complemento = [v for v in sub_vertices if v not in mip_set]
+
             particion = self.sia_subsistema.bipartir(
                 np.array(clave[EFFECT], dtype=np.int8),
                 np.array(clave[ACTUAL], dtype=np.int8),
             )
             dist = particion.distribucion_marginal()
 
+            phi_total += phi_mip
             if phi_mip < mejor_phi:
                 mejor_phi = phi_mip
                 mejor_dist = dist
-
-            mip_flat = KQNodes._flatten_grupo(list(mip))
-            mip_set = set(mip_flat)
-            complemento = [v for v in sub_vertices if v not in mip_set]
 
             grupos.pop(idx_mayor)
             grupos.append(mip_flat)
@@ -173,8 +186,7 @@ class KQNodes(SIA):
                         emd_particion_candidata = emd_delta
 
                 omegas_ciclo.append(deltas_ciclo[indice_mip])
-                deltas_ciclo[indice_mip] = deltas_ciclo[-1]
-                deltas_ciclo.pop()
+                deltas_ciclo.pop(indice_mip)
 
             self.memoria_grupo_candidato[
                 tuple(
@@ -253,7 +265,9 @@ class KQNodes(SIA):
         return emd_union, emd_delta
 
     def _fmt_grupos(self, grupos: list[list]) -> str:
-        """Formatea k grupos con fmt_parte_q, separados por ‖."""
+        """Formatea k grupos: sin separador para k=2 (compatible con QNodes), ‖ para k>2."""
+        if len(grupos) == 2:
+            return fmt_biparticion_q(grupos[0], grupos[1])
         partes = [fmt_parte_q(g) for g in grupos]
         tops    = "‖".join(top    for top,    _ in partes)
         bottoms = "‖".join(bottom for _, bottom in partes)
