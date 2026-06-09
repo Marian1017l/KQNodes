@@ -149,7 +149,7 @@ class KQNodes(SIA):
             emd_particion_candidata = INFTY_POS
 
             for _ in range(len(deltas_ciclo) - 1):
-                emd_local = 1e5
+                emd_local = INFTY_POS
                 indice_mip: int
 
                 for k in range(len(deltas_ciclo)):
@@ -173,7 +173,8 @@ class KQNodes(SIA):
                         emd_particion_candidata = emd_delta
 
                 omegas_ciclo.append(deltas_ciclo[indice_mip])
-                deltas_ciclo.pop(indice_mip)
+                deltas_ciclo[indice_mip] = deltas_ciclo[-1]
+                deltas_ciclo.pop()
 
             self.memoria_grupo_candidato[
                 tuple(
