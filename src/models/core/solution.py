@@ -104,6 +104,8 @@ class Solution:
         tiempo_total: float = FLOAT_ZERO,
         quiere_hablar: bool = True,
         voz: Optional[str] = None,
+        phi_arbol: Optional[float] = None,
+        grupos_finales: Optional[list] = None,
     ) -> None:
         """
         Inicializa una nueva instancia de Solution.
@@ -128,6 +130,8 @@ class Solution:
         self.tiempo_ejecucion = tiempo_total
         self.id_voz = voz
         self.hablar = quiere_hablar
+        self.phi_arbol = phi_arbol
+        self.grupos_finales = grupos_finales
 
     def __obtener_voz_espanol(self, motor: Engine) -> Optional[str]:
         """
