@@ -93,61 +93,64 @@ class KQNodes(SIA):
         )
 
     def _algorithm_k(self, vertices: list, k: int) -> tuple:
-        """Biparticiones sucesivas hasta k grupos, subdividiendo siempre el más grande.
+        """Biparticiones sucesivas hasta k grupos.
 
-        phi_total = suma de φ de cada paso; mejor_dist = dist del paso con menor φ.
+        En cada iteración se evalúa la mejor bipartición posible de CADA grupo
+        divisible (no solo el más grande) y se subdivide el que produzca el
+        menor φ. phi_total = suma de φ de cada paso elegido.
         """
         grupos = [list(vertices)]
         phi_total = 0.0
-        mejor_phi = INFTY_POS
-        mejor_dist = None
 
         for _ in range(k - 1):
-            idx_mayor = max(range(len(grupos)), key=lambda i: len(grupos[i]))
-            sub_vertices = grupos[idx_mayor]
+            mejor_idx = None
+            mejor_phi = INFTY_POS
+            mejor_mip_flat = None
+            mejor_complemento = None
 
-            if len(sub_vertices) <= 1:  # Bug C: no se puede bipartir un grupo de ≤1 vértice
+            for idx, grupo in enumerate(grupos):
+                if len(grupo) <= 1:
+                    continue
+
+                if len(grupo) == 2:
+                    v0, v1 = grupo
+                    nodos_v0 = [v0] if isinstance(v0, tuple) else v0
+                    nodos_v1 = [v1] if isinstance(v1, tuple) else v1
+                    mask_v0_a, mask_v0_e = KQNodes._nodos_a_bitmask(nodos_v0)
+                    mask_v1_a, mask_v1_e = KQNodes._nodos_a_bitmask(nodos_v1)
+                    _, phi_v0 = self.funcion_submodular(v0, mask_v1_a, mask_v1_e)
+                    _, phi_v1 = self.funcion_submodular(v1, mask_v0_a, mask_v0_e)
+                    if phi_v0 <= phi_v1:
+                        phi_corte, mip_flat, complemento = phi_v0, [v0], [v1]
+                    else:
+                        phi_corte, mip_flat, complemento = phi_v1, [v1], [v0]
+                else:
+                    self.vertices = set(grupo)
+                    self.memoria_grupo_candidato = {}
+
+                    mip = self.algorithm(grupo)
+                    phi_corte = self.memoria_grupo_candidato[mip]
+
+                    mip_flat = KQNodes._flatten_grupo(list(mip))
+                    mip_set = set(mip_flat)
+                    complemento = [v for v in grupo if v not in mip_set]
+
+                if phi_corte < mejor_phi:
+                    mejor_phi = phi_corte
+                    mejor_idx = idx
+                    mejor_mip_flat = mip_flat
+                    mejor_complemento = complemento
+
+            if mejor_idx is None:
                 continue
 
-            if len(sub_vertices) == 2:  # Bug D: bipartición directa sin pasar por algorithm
-                v0, v1 = sub_vertices
-                nodos_v0 = [v0] if isinstance(v0, tuple) else v0
-                nodos_v1 = [v1] if isinstance(v1, tuple) else v1
-                mask_v0_a, mask_v0_e = KQNodes._nodos_a_bitmask(nodos_v0)
-                mask_v1_a, mask_v1_e = KQNodes._nodos_a_bitmask(nodos_v1)
-                _, phi_v0 = self.funcion_submodular(v0, mask_v1_a, mask_v1_e)
-                _, phi_v1 = self.funcion_submodular(v1, mask_v0_a, mask_v0_e)
-                if phi_v0 <= phi_v1:
-                    phi_mip, mip_flat, complemento = phi_v0, [v0], [v1]
-                else:
-                    phi_mip, mip_flat, complemento = phi_v1, [v1], [v0]
-                clave = self.definir_clave(mip_flat)
-            else:
-                self.vertices = set(sub_vertices)
-                self.memoria_grupo_candidato = {}
+            phi_total += mejor_phi
+            grupos.pop(mejor_idx)
+            grupos.append(mejor_mip_flat)
+            grupos.append(mejor_complemento)
 
-                mip = self.algorithm(sub_vertices)
-                phi_mip = self.memoria_grupo_candidato[mip]
-
-                clave = self.definir_clave(list(mip))
-                mip_flat = KQNodes._flatten_grupo(list(mip))
-                mip_set = set(mip_flat)
-                complemento = [v for v in sub_vertices if v not in mip_set]
-
-            particion = self.sia_subsistema.bipartir(
-                np.array(clave[EFFECT], dtype=np.int8),
-                np.array(clave[ACTUAL], dtype=np.int8),
-            )
-            dist = particion.distribucion_marginal()
-
-            phi_total += phi_mip
-            if phi_mip < mejor_phi:
-                mejor_phi = phi_mip
-                mejor_dist = dist
-
-            grupos.pop(idx_mayor)
-            grupos.append(mip_flat)
-            grupos.append(complemento)
+        if len(grupos) != k:
+            raise RuntimeError(f"KQNodes produjo {len(grupos)} grupos, se esperaban {k}")
 
         grupos_arr = []
         for grupo in grupos:
