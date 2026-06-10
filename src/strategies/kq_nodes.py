@@ -78,16 +78,18 @@ class KQNodes(SIA):
         self.memoria_union = {}
         self.memoria_grupo_candidato = {}
 
-        phi_total, dist_mip, grupos = self._algorithm_k(vertices, k)
+        phi_total, delta_k_real, dist_total, grupos = self._algorithm_k(vertices, k)
         fmt_particion = self._fmt_grupos(grupos)
 
         return Solution(
             estrategia=KQNODES_LABEL,
-            perdida=phi_total,
+            perdida=delta_k_real,
             distribucion_subsistema=self.sia_dists_marginales,
-            distribucion_particion=dist_mip,
+            distribucion_particion=dist_total,
             tiempo_total=time.time() - self.sia_tiempo_inicio,
             particion=fmt_particion,
+            phi_arbol=phi_total,
+            grupos_finales=grupos,
         )
 
     def _algorithm_k(self, vertices: list, k: int) -> tuple:
