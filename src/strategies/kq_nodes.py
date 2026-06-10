@@ -147,10 +147,17 @@ class KQNodes(SIA):
             grupos.append(mip_flat)
             grupos.append(complemento)
 
-        if mejor_dist is None:
-            mejor_dist = self.sia_dists_marginales
+        grupos_arr = []
+        for grupo in grupos:
+            clave_g = self.definir_clave(grupo)
+            alcance_g = np.array(clave_g[EFFECT], dtype=np.int8)
+            mecanismo_g = np.array(clave_g[ACTUAL], dtype=np.int8)
+            grupos_arr.append((alcance_g, mecanismo_g))
 
-        return phi_total, mejor_dist, grupos
+        dist_total = self.sia_subsistema.particionar_k(grupos_arr).distribucion_marginal()
+        delta_k_real = emd_efecto(dist_total, self.sia_dists_marginales)
+
+        return phi_total, delta_k_real, dist_total, grupos
 
     @profile(context={TYPE_TAG: KQNODES_ANALYSIS_TAG})
     def algorithm(self, vertices: list[tuple[int, int]]):
