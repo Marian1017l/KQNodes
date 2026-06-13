@@ -258,11 +258,28 @@ class System:
                 else cubo.marginalizar(mecanismo)
                 for cubo in self.ncubos
             )
-        else:
-            self.memo[clave] = self.memo[clave]
 
         nuevo_sistema.ncubos = self.memo[clave]
 
+        return nuevo_sistema
+    
+    def particionar_k(
+        self,
+        grupos: list[tuple[NDArray[np.int8], NDArray[np.int8]]],
+    ) -> "System":
+        
+        mecanismo_por_indice: dict[int, NDArray[np.int8]] = {}
+        for alcance_g, mecanismo_g in grupos:
+            for indice in alcance_g:
+                mecanismo_por_indice[int(indice)] = mecanismo_g
+
+        nuevo_sistema = System.__new__(System)
+        nuevo_sistema.estado_inicial = self.estado_inicial
+        nuevo_sistema.memo = {}
+        nuevo_sistema.ncubos = tuple(
+            cube.marginalizar(np.setdiff1d(cube.dims, mecanismo_por_indice[cube.indice]))
+            for cube in self.ncubos
+        )
         return nuevo_sistema
 
     def distribucion_marginal(self):

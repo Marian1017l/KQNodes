@@ -1,6 +1,8 @@
 from src.controllers.manager import Manager
 from src.strategies.force import BruteForce
 from src.strategies.geometric import GeometricSIA
+from src.strategies.q_nodes import QNodes
+from src.strategies.kq_nodes import KQNodes
 
 
 def iniciar():
@@ -21,16 +23,26 @@ def iniciar():
     )
     print(resultado_bf)
 
-
-    # Prueba GeometricSIA
     analizador_geo = GeometricSIA(mpt)
-    resultado = analizador_geo.aplicar_estrategia(
+    resultado_geo = analizador_geo.aplicar_estrategia(
         estado_inicial,
         condiciones,
         alcance,
         mecanismo,
     )
-    print(resultado)
+    print(resultado_geo)
+
+    analizador_q = QNodes(mpt)
+    resultado_q = analizador_q.aplicar_estrategia(
+        estado_inicial, condiciones, alcance, mecanismo,
+    )
+    print(resultado_q)
+
+    analizador_kq = KQNodes(mpt)
+    resultado_kq = analizador_kq.aplicar_estrategia(
+        estado_inicial, condiciones, alcance, mecanismo, k=3,
+    )
+    print(resultado_kq)
 
 if __name__ == "__main__":
     iniciar()
